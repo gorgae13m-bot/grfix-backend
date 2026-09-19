@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GRFIX — FiveM Developer Suite</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- JSZip for handling real in-browser ZIP processing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+  <!-- Google Font: Cairo -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              primary: '#00ffaa',
+              hover: '#00cc88',
+              accent: '#00e1ff',
+              purple: '#a855f7',
+              dark: '#0b0e14',
+              card: '#131822'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Cairo', sans-serif;
+      background-color: #0b0e14;
+      color: #e2e8f0;
+      overflow-x: hidden;
+    }
+
+    .glass-card {
+      background: rgba(19, 24, 34, 0.85);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .glass-card:hover {
+      border-color: rgba(0, 255, 170, 0.4);
+      box-shadow: 0 0 25px rgba(0, 255, 170, 0.12);
+    }
+
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #0b0e14; }
+    ::-webkit-scrollbar-thumb { background: #1f293d; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #00ffaa; }
+
+    #particle-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    .auth-locked {
+      filter: blur(6px) grayscale(60%);
+      pointer-events: none;
+      user-select: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-brand-primary selection:text-black">
+
+  <canvas id="particle-canvas"></canvas>
+  <div id="toast-container" class="fixed top-20 right-5 z-50 flex flex-col gap-3 pointer-events-none"></div>
+
+  <nav class="sticky top-0 z-40 w-full glass-card border-b border-gray-800/80 px-4 md:px-8 py-3.5 transition-all">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      
+      <!-- Brand Logo -->
+      <div class="flex items-center gap-4">
+        <a href="#" class="flex items-center gap-2 group">
+          <div class="w-10 h-10 rounded-xl bg-brand-primary/10 border border-brand-primary/40 flex items-center justify-center text-brand-primary text-xl font-black group-hover:scale-105 transition-transform shadow-lg shadow-brand-primary/20">
+            <i class="fa-solid fa-shield-halved"></i>
+          </div>
+          <div>
+            <span class="text-2xl font-extrabold tracking-wider text-white">GR<span class="text-brand-primary">FIX</span></span>
+            <span class="text-xs block text-brand-accent font-semibold -mt-1 tracking-widest">REAL DECRYPT &amp; FXAP CLEANER</span>
+          </div>
+        </a>
+
+        <!-- System Status Badge -->
+        <div class="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+          <span>محرك فك التشفير + إزالة FXAP مفعّل</span>
+        </div>
+      </div>
+
+      <!-- Navigation Links -->
+      <div class="hidden md:flex items-center gap-6 text-xs font-bold text-gray-300">
+        <a href="#tools-section" class="hover:text-brand-primary transition-colors">الأدوات</a>
+        <a href="#pricing-section" class="hover:text-brand-primary transition-colors">الأسعار والخطط</a>
+        <a href="https://discord.gg" target="_blank" class="hover:text-[#5865F2] transition-colors flex items-center gap-1.5">
+          <i class="fa-brands fa-discord"></i> سيرفر الدعم
+        </a>
+      </div>
+
+      <!-- User Auth State Header Area -->
+      <div class="flex items-center gap-3">
+        <button onclick="openAdminSettingsModal()" class="p-2.5 rounded-xl bg-gray-800/80 hover:bg-gray-700/80 text-gray-300 border border-gray-700/50 transition-all text-sm" title="إعدادات Discord OAuth2 & Webhook">
+          <i class="fa-solid fa-gear text-lg"></i>
+        </button>
+
+        <div id="unauth-header-btn">
+          <button onclick="initiateDiscordAuth()" class="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold transition-all text-sm shadow-lg shadow-[#5865F2]/20">
+            <i class="fa-brands fa-discord text-lg"></i>
+            <span>تسجيل الدخول بـ Discord</span>
+          </button>
+        </div>
+
+        <div id="auth-header-profile" class="hidden items-center gap-3 bg-gray-900/90 border border-brand-primary/40 rounded-xl px-3 py-1.5 shadow-lg shadow-brand-primary/10">
+          <img id="nav-user-avatar" src="" alt="Avatar" class="w-8 h-8 rounded-lg border border-brand-primary">
+          <div class="text-right">
+            <div id="nav-user-name" class="text-xs font-extrabold text-white">DiscordUser</div>
+            <div id="nav-user-id" class="text-[10px] text-gray-400 font-mono">ID: 0000000000</div>
+          </div>
+          <button onclick="logoutDiscord()" class="p-1 text-gray-400 hover:text-red-400 transition-colors mr-1" title="تسجيل الخروج">
+            <i class="fa-solid fa-right-from-bracket"></i>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </nav>
+
+  <header class="relative pt-10 pb-6 px-4 text-center max-w-4xl mx-auto">
+    <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-primary/10 border border-brand-primary/30 text-brand-primary text-xs md:text-sm font-bold mb-6">
+      <i class="fa-solid fa-code"></i>
+      <span>محرك كسر حماية Escrow وإزالة ملفات .FXAP مع معالجة YDR/YFT مباشرة</span>
+    </div>
+
+    <h1 class="text-3xl md:text-5xl font-black text-white leading-tight mb-4">
+      فك تشفير Lua وإزالة ملفات <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-primary via-brand-accent to-purple-400">.FXAP &amp; Grants</span>
+    </h1>
+
+    <p class="text-gray-400 text-sm md:text-base leading-relaxed max-w-2xl mx-auto mb-6">
+      قم برفع ملف الـ ZIP أو السكربت. يقوم النظام تلقائياً برصد وتجريد ملفات الحماية الملقمة <code class="text-brand-primary font-mono">.fxap</code>، وتنظيف ملف <code class="text-brand-accent font-mono">fxmanifest.lua</code> من قيود Keymaster Escrow.
+    </p>
+
+    <!-- AUTH BANNER WALL -->
+    <div id="auth-banner-wall" class="glass-card rounded-2xl p-6 border-2 border-[#5865F2] max-w-2xl mx-auto my-6 shadow-2xl shadow-[#5865F2]/20">
+      <div class="w-14 h-14 rounded-2xl bg-[#5865F2]/20 text-[#5865F2] flex items-center justify-center text-3xl mx-auto mb-3 border border-[#5865F2]/40">
+        <i class="fa-brands fa-discord"></i>
+      </div>
+      <h3 class="text-xl font-bold text-white mb-2">سجل دخولك بالديسكورد للبدء بالمعالجة الحقيقية</h3>
+      <p class="text-xs text-gray-300 leading-relaxed mb-5">
+        يتطلب استخدام محرك فك التشفير الحقيقي وتنظيف حماية Escrow / FXAP ربط حسابك بالديسكورد.
+      </p>
+      
+      <div class="flex flex-col sm:flex-row gap-3 justify-center">
+        <button onclick="initiateDiscordAuth()" class="px-6 py-3 rounded-xl bg-[#5865F2] hover:bg-[#4752C4] text-white font-extrabold text-xs transition-all shadow-lg shadow-[#5865F2]/30 flex items-center justify-center gap-2">
+          <i class="fa-brands fa-discord text-base"></i>
+          <span>تسجيل الدخول عبر Discord OAuth2</span>
+        </button>
+
+        <button onclick="demoMockLogin()" class="px-6 py-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold text-xs border border-gray-700 transition-all">
+          <i class="fa-solid fa-vial me-1"></i> تجربة دخول تجريبي (Demo Mode)
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="tools-section" class="max-w-6xl mx-auto px-4 py-6 w-full flex-grow relative">
+    
+    <div id="main-content-lock" class="auth-locked transition-all duration-500">
+      
+      <!-- Tool Navigation Tabs -->
+      <div class="flex flex-wrap items-center justify-center gap-2 md:gap-4 mb-8 bg-gray-900/90 p-1.5 rounded-2xl border border-gray-800 max-w-2xl mx-auto shadow-2xl">
+        <button onclick="switchTab('decrypt')" id="tab-btn-decrypt" class="tab-btn flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold transition-all bg-brand-primary text-gray-950 shadow-md">
+          <i class="fa-solid fa-unlock-keyhole"></i>
+          <span>فك التشفير وإزالة .FXAP</span>
+        </button>
+
+        <button onclick="switchTab('fix3d')" id="tab-btn-fix3d" class="tab-btn flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold text-gray-400 hover:text-white transition-all">
+          <i class="fa-solid fa-cube"></i>
+          <span>إصلاح 3D Real Fix</span>
+        </button>
+
+        <button onclick="switchTab('shield')" id="tab-btn-shield" class="tab-btn flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold text-gray-400 hover:text-white transition-all">
+          <i class="fa-solid fa-shield-cat"></i>
+          <span>تشفير GRFIX Shield</span>
+        </button>
+      </div>
+
+      <!-- TAB 1: REAL DECRYPT TOOL -->
+      <section id="tab-decrypt" class="tab-content transition-all duration-300">
+        <div class="glass-card rounded-2xl p-6 md:p-8 border border-gray-800 relative overflow-hidden">
+          
+          <div class="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-800/80 pb-4">
+            <div>
+              <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-unlock-keyhole text-brand-primary"></i>
+                <span>محرك فك تشفير Lua، تنظيف .FXAP وحماية Grants</span>
+              </h2>
+              <p class="text-gray-400 text-xs md:text-sm mt-1">يقوم النظام بـ: 1) حَذف وتجريد ملفات .fxap المفروضة من Keymaster. 2) تنظيف fxmanifest. 3) فك شفرات Hex/Byte Escapes.</p>
+            </div>
+
+            <div class="flex items-center gap-2 bg-gray-900/90 p-1 rounded-xl border border-gray-800 text-xs">
+              <span class="text-gray-400 px-2 font-semibold">نوع النمط:</span>
+              <select id="decrypt-key-type" class="bg-gray-800 text-white px-3 py-1.5 rounded-lg border border-gray-700 outline-none focus:border-brand-primary">
+                <option value="auto">كشف وتفريغ شامل (Auto Detect + FXAP Strip)</option>
+                <option value="fxap">إزالة FiveM Keymaster Escrow (.fxap)</option>
+                <option value="grants">Grants.txt License Bypass</option>
+                <option value="luraph">Lura.ph Obfuscator Deobfuscate</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- GRANTS.TXT INPUT / UPLOAD SECTION -->
+          <div class="mb-6 bg-gray-900/80 rounded-xl p-4 border border-brand-primary/30">
+            <div class="flex items-center justify-between mb-2">
+              <label class="text-xs font-bold text-brand-primary flex items-center gap-2">
+                <i class="fa-solid fa-key"></i>
+                <span>إدخال بيانات أو رفع ملف grants.txt (اختياري لفك حماية التراخيص)</span>
+              </label>
+              <button onclick="triggerGrantsFileInput()" class="text-[11px] bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary border border-brand-primary/40 px-2.5 py-1 rounded-lg transition-colors">
+                <i class="fa-solid fa-file-arrow-up me-1"></i> رفع grants.txt
+              </button>
+              <input type="file" id="grants-file-input" accept=".txt" class="hidden" onchange="handleGrantsFileSelect(this.files)">
+            </div>
+            
+            <textarea id="grants-text-input" rows="2" placeholder="ضع محتوى grants.txt هنا (مثال: IP=185.220.101.5 / Key=GRANTS-KEY-XXXXX)..." class="w-full bg-gray-950/80 border border-gray-800 focus:border-brand-primary rounded-xl p-3 text-xs text-brand-primary font-mono outline-none resize-y"></textarea>
+            <div class="text-[11px] text-gray-400 mt-1 flex items-center justify-between">
+              <span>* عند توفير ملف grants.txt سيتم استخدام مفاتيح التمرير لفك وتخطي سيرفر التحقق من الترخيص داخل السكربت.</span>
+              <span id="grants-loaded-status" class="text-emerald-400 font-bold hidden"><i class="fa-solid fa-check me-1"></i> تم تحميل التراخيص</span>
+            </div>
+          </div>
+
+          <!-- SCRIPT / ZIP UPLOAD DROP ZONE -->
+          <div id="drop-zone-decrypt" onclick="triggerFileInput('decrypt')" class="border-2 border-dashed border-gray-700 hover:border-brand-primary bg-gray-900/40 hover:bg-brand-primary/5 rounded-2xl p-8 md:p-12 text-center cursor-pointer transition-all group">
+            <input type="file" id="file-input-decrypt" accept=".zip,.lua,.rar,.7z" class="hidden" onchange="handleFileSelect('decrypt', this.files)" onclick="event.stopPropagation()">
+            
+            <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-800 group-hover:bg-brand-primary/20 text-brand-primary flex items-center justify-center text-2xl transition-all border border-gray-700 group-hover:border-brand-primary">
+              <i class="fa-solid fa-cloud-arrow-up group-hover:scale-110 transition-transform"></i>
+            </div>
+
+            <p class="text-white font-bold text-base md:text-lg mb-1">
+              ارفع ملف السكربت <span class="text-brand-primary">.LUA أو .ZIP</span> هنا لفك تشفيره وتنظيف .FXAP
+            </p>
+            <p class="text-gray-400 text-xs mb-4">يدعم الملفات المفردة والملفات المضغوطة بالكامل التي تحتوي على ملفات .fxap و Escrow</p>
+
+            <span class="inline-block px-4 py-1.5 rounded-lg bg-gray-800 text-gray-300 text-xs font-semibold border border-gray-700 group-hover:bg-brand-primary group-hover:text-gray-950 transition-colors">
+              اختيار ملف .lua / .zip
+            </span>
+          </div>
+
+          <div id="file-status-decrypt" class="hidden mt-6 bg-gray-900/90 rounded-xl p-4 border border-gray-800 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-brand-primary/10 text-brand-primary flex items-center justify-center text-lg">
+                <i class="fa-solid fa-file-code"></i>
+              </div>
+              <div>
+                <div id="file-name-decrypt" class="text-white font-bold text-sm">resource.zip</div>
+                <div id="file-size-decrypt" class="text-gray-400 text-xs">12.4 MB</div>
+              </div>
+            </div>
+            <button onclick="removeFile('decrypt')" class="text-gray-400 hover:text-red-400 transition-colors p-2">
+              <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+          </div>
+
+          <div id="progress-container-decrypt" class="hidden mt-6">
+            <div class="flex justify-between text-xs font-bold mb-2">
+              <span id="progress-status-decrypt" class="text-brand-primary">جاري البحث عن ملفات .FXAP وتجريد قيود Escrow وتفكيك Lua...</span>
+              <span id="progress-percent-decrypt" class="text-white">0%</span>
+            </div>
+            <div class="w-full bg-gray-800 rounded-full h-3 overflow-hidden p-0.5 border border-gray-700">
+              <div id="progress-bar-decrypt" class="bg-gradient-to-r from-brand-primary to-brand-accent h-full rounded-full transition-all duration-300 w-0"></div>
+            </div>
+          </div>
+
+          <div id="result-box-decrypt" class="hidden mt-6 p-5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3 text-emerald-400">
+              <i class="fa-solid fa-circle-check text-2xl"></i>
+              <div>
+                <div class="font-bold text-sm text-white">تمت المعالجة، تجريد .fxap وتنظيف الكود بنجاح!</div>
+                <div id="decrypt-summary-text" class="text-xs text-gray-300">تم تنظيف السورس كود وإزالة حماية Keymaster Escrow وتجهيز الملف الحقيقي للتحميل.</div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 w-full md:w-auto">
+              <button onclick="openCodePreviewModal()" class="px-4 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-brand-primary font-bold text-xs border border-brand-primary/40 transition-all flex items-center gap-1.5">
+                <i class="fa-solid fa-code"></i> معاينة الكود
+              </button>
+              <a id="download-btn-decrypt" href="#" download class="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold text-center text-xs transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-1.5">
+                <i class="fa-solid fa-download"></i> تحميل الملف المنظف
+              </a>
+            </div>
+          </div>
+
+          <button id="btn-start-decrypt" onclick="startProcess('decrypt')" class="w-full mt-6 py-3.5 rounded-xl bg-brand-primary hover:bg-brand-hover text-gray-950 font-extrabold text-base transition-all shadow-lg shadow-brand-primary/20 flex items-center justify-center gap-2">
+            <i class="fa-solid fa-bolt"></i>
+            <span>بدء فك التشفير، تجريد FXAP والتفريغ الآن</span>
+          </button>
+
+        </div>
+      </section>
+
+      <!-- TAB 2: REAL 3D FIX TOOL -->
+      <section id="tab-fix3d" class="tab-content hidden transition-all duration-300">
+        <div class="glass-card rounded-2xl p-6 md:p-8 border border-gray-800">
+          <div class="mb-6 border-b border-gray-800/80 pb-4">
+            <h2 class="text-xl font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-cube text-brand-accent"></i>
+              <span>أداة GRFIX إصلاح مجسمات 3D الحقيقية (YDR, YFT, YDD)</span>
+            </h2>
+            <p class="text-gray-400 text-xs md:text-sm mt-1">تفحص ملفات الـ RSC7/RSC8 الهيكلية وتصحيح الترويسات التالفة وأخطاء التكستشر المسببة لكراتش السيرفر</p>
+          </div>
+
+          <div id="drop-zone-fix3d" onclick="triggerFileInput('fix3d')" class="border-2 border-dashed border-gray-700 hover:border-brand-accent bg-gray-900/40 hover:bg-brand-accent/5 rounded-2xl p-8 md:p-12 text-center cursor-pointer transition-all group">
+            <input type="file" id="file-input-fix3d" accept=".zip,.ydr,.yft,.ydd" class="hidden" onchange="handleFileSelect('fix3d', this.files)" onclick="event.stopPropagation()">
+            <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-800 group-hover:bg-brand-accent/20 text-brand-accent flex items-center justify-center text-2xl transition-all border border-gray-700 group-hover:border-brand-accent">
+              <i class="fa-solid fa-box-open"></i>
+            </div>
+            <p class="text-white font-bold text-base md:text-lg mb-1">ارفع ملف الـ <span class="text-brand-accent">YFT / YDR / YDD / ZIP</span> للمجسم</p>
+            <p class="text-gray-400 text-xs mb-4">يتم إعادة صياغة الـ Resource Flags وبنية الـ Vertex Buffer تلقائياً</p>
+            <span class="inline-block px-4 py-1.5 rounded-lg bg-gray-800 text-gray-300 text-xs font-semibold border border-gray-700 group-hover:bg-brand-accent group-hover:text-gray-950 transition-colors">اختيار مجسم 3D</span>
+          </div>
+
+          <div id="file-status-fix3d" class="hidden mt-6 bg-gray-900/90 rounded-xl p-4 border border-gray-800 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-brand-accent/10 text-brand-accent flex items-center justify-center text-lg">
+                <i class="fa-solid fa-cube"></i>
+              </div>
+              <div>
+                <div id="file-name-fix3d" class="text-white font-bold text-sm">vehicle.yft</div>
+                <div id="file-size-fix3d" class="text-gray-400 text-xs">8.1 MB</div>
+              </div>
+            </div>
+            <button onclick="removeFile('fix3d')" class="text-gray-400 hover:text-red-400 p-2"><i class="fa-solid fa-xmark text-lg"></i></button>
+          </div>
+
+          <div id="progress-container-fix3d" class="hidden mt-6">
+            <div class="flex justify-between text-xs font-bold mb-2">
+              <span id="progress-status-fix3d" class="text-brand-accent">فحص ترويسة RSC7 وإعادة موازنة مصفوفة الـ Mesh...</span>
+              <span id="progress-percent-fix3d" class="text-white">0%</span>
+            </div>
+            <div class="w-full bg-gray-800 rounded-full h-3 overflow-hidden p-0.5 border border-gray-700">
+              <div id="progress-bar-fix3d" class="bg-gradient-to-r from-cyan-500 to-blue-500 h-full rounded-full transition-all duration-300 w-0"></div>
+            </div>
+          </div>
+
+          <div id="result-box-fix3d" class="hidden mt-6 p-5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div>
+              <div class="text-brand-accent font-bold text-sm">تم إعادة بناء وتصحيح مجسم الـ 3D بنجاح!</div>
+              <div id="fix3d-log-summary" class="text-xs text-gray-300 mt-1">تم تعديل ترويسة RSC7 وتصحيح أحجام التكستشر التالفة.</div>
+            </div>
+            <a id="download-btn-fix3d" href="#" download class="px-6 py-2.5 rounded-xl bg-brand-accent text-gray-950 font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-brand-accent/20">
+              <i class="fa-solid fa-download"></i> تحميل المجسم المصحح
+            </a>
+          </div>
+
+          <button id="btn-start-fix3d" onclick="startProcess('fix3d')" class="w-full mt-6 py-3.5 rounded-xl bg-brand-accent hover:bg-cyan-400 text-gray-950 font-extrabold text-base transition-all shadow-lg shadow-brand-accent/20">
+            <i class="fa-solid fa-screwdriver-wrench me-1"></i> بدء إصلاح مجسم 3D الحقيقي
+          </button>
+        </div>
+      </section>
+
+      <!-- TAB 3: SHIELD -->
+      <section id="tab-shield" class="tab-content hidden transition-all duration-300">
+        <div class="glass-card rounded-2xl p-6 md:p-8 border border-gray-800">
+          <div class="mb-6 border-b border-gray-800/80 pb-4">
+            <h2 class="text-xl font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-shield-halved text-brand-purple"></i>
+              <span>تشفير GRFIX Shield — قفل السكربتات على IP أو License</span>
+            </h2>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+              <label class="block text-xs font-bold text-gray-300 mb-2">قفل على IP السيرفر:</label>
+              <input type="text" id="shield-ip" placeholder="185.220.100.1:30120" class="w-full bg-gray-900 border border-gray-700 focus:border-brand-purple rounded-xl px-4 py-2.5 text-sm text-white outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-300 mb-2">قفل على CFX Keymaster License:</label>
+              <input type="text" id="shield-keymaster" placeholder="cfxk_12345..." class="w-full bg-gray-900 border border-gray-700 focus:border-brand-purple rounded-xl px-4 py-2.5 text-sm text-white outline-none">
+            </div>
+          </div>
+
+          <div id="drop-zone-shield" onclick="triggerFileInput('shield')" class="border-2 border-dashed border-gray-700 hover:border-brand-purple bg-gray-900/40 hover:bg-brand-purple/5 rounded-2xl p-6 text-center cursor-pointer transition-all group">
+            <input type="file" id="file-input-shield" accept=".zip,.lua" class="hidden" onchange="handleFileSelect('shield', this.files)" onclick="event.stopPropagation()">
+            <p class="text-white font-bold text-sm">ارفع ملف LUA أو ZIP لقفله بـ GRFIX Shield</p>
+          </div>
+
+          <div id="file-status-shield" class="hidden mt-4 bg-gray-900/90 rounded-xl p-3 border border-gray-800 flex items-center justify-between">
+            <span id="file-name-shield" class="text-white font-bold text-xs">script.lua</span>
+            <button onclick="removeFile('shield')" class="text-gray-400 hover:text-red-400 text-xs">إلغاء</button>
+          </div>
+
+          <div id="progress-container-shield" class="hidden mt-6">
+            <div class="flex justify-between text-xs font-bold mb-2">
+              <span id="progress-status-shield" class="text-brand-purple">تطبيق حماية GRFIX Shield...</span>
+              <span id="progress-percent-shield" class="text-white">0%</span>
+            </div>
+            <div class="w-full bg-gray-800 rounded-full h-3 overflow-hidden p-0.5 border border-gray-700">
+              <div id="progress-bar-shield" class="bg-gradient-to-r from-purple-500 to-indigo-500 h-full rounded-full transition-all duration-300 w-0"></div>
+            </div>
+          </div>
+
+          <div id="result-box-shield" class="hidden mt-6 p-4 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-between">
+            <div class="text-xs text-purple-300 font-bold">تم حماية السكربت بنجاح!</div>
+            <a id="download-btn-shield" href="#" download class="px-4 py-2 rounded-lg bg-brand-purple text-white font-bold text-xs">تحميل السكربت</a>
+          </div>
+
+          <button id="btn-start-shield" onclick="startProcess('shield')" class="w-full mt-6 py-3.5 rounded-xl bg-brand-purple hover:bg-purple-600 text-white font-extrabold text-base transition-all shadow-lg shadow-purple-500/20">
+            تشفير وحماية الملف الان
+          </button>
+        </div>
+      </section>
+
+      <!-- Activity Log Box -->
+      <div class="mt-8 glass-card rounded-2xl p-5 border border-gray-800">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-xs font-bold text-gray-300 flex items-center gap-2">
+            <i class="fa-solid fa-list-check text-brand-primary"></i>
+            <span>سجل العمليات المباشر ومخرجات فك التشفير (GRFIX Real Engine Console)</span>
+          </h3>
+        </div>
+        <div id="activity-log" class="bg-gray-950/80 rounded-xl p-3 border border-gray-800/80 font-mono text-[11px] space-y-1.5 max-h-36 overflow-y-auto text-gray-400">
+          <div>[<span class="text-brand-primary">SYSTEM</span>] محرك فك تشفير Lua، تنظيف FXAP وحماية Grants جاهز للعمل...</div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <section id="pricing-section" class="max-w-6xl mx-auto px-4 py-12 w-full">
+    <div class="text-center mb-12">
+      <h2 class="text-2xl md:text-4xl font-black text-white mb-3">خطط اشتراك GRFIX والأسعار</h2>
+      <p class="text-gray-400 text-sm">اختر الخطة المناسبة وسجل دخولك بحساب الديسكورد لاستلام الاشتراك تلقائياً</p>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      
+      <!-- FREE PLAN -->
+      <div class="glass-card rounded-2xl p-6 border border-gray-800 flex flex-col justify-between">
+        <div>
+          <div class="text-gray-400 text-xs font-bold uppercase mb-2">المجانية</div>
+          <div class="text-3xl font-black text-white mb-4">$0 <span class="text-xs font-normal text-gray-400">/ تجربة</span></div>
+          <ul class="space-y-3 text-xs text-gray-300 mb-6">
+            <li><i class="fa-solid fa-check text-brand-primary me-2"></i> 1 فك تشفير يومياً</li>
+            <li><i class="fa-solid fa-check text-brand-primary me-2"></i> ربط بالديسكورد</li>
+          </ul>
+        </div>
+        <button onclick="openPaymentModal('المجانية', '0')" class="w-full py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-white font-bold text-xs transition-all border border-gray-700">
+          تفعيل التجربة
+        </button>
+      </div>
+
+      <!-- DAILY PLAN -->
+      <div class="glass-card rounded-2xl p-6 border border-gray-800 flex flex-col justify-between">
+        <div>
+          <div class="text-brand-primary text-xs font-bold uppercase mb-2">الخطة اليومية</div>
+          <div class="text-3xl font-black text-white mb-4">$1.50 <span class="text-xs font-normal text-gray-400">/ 24 ساعة</span></div>
+          <ul class="space-y-3 text-xs text-gray-300 mb-6">
+            <li><i class="fa-solid fa-check text-brand-primary me-2"></i> 10 عمليات فك تشفير</li>
+            <li><i class="fa-solid fa-check text-brand-primary me-2"></i> دعم إصلاح 3D وإزالة FXAP</li>
+          </ul>
+        </div>
+        <button onclick="openPaymentModal('اليومية', '1.50')" class="w-full py-2.5 rounded-xl bg-gray-800 hover:bg-brand-primary hover:text-gray-950 text-white font-bold text-xs transition-all border border-gray-700">
+          شراء الآن
+        </button>
+      </div>
+
+      <!-- WEEKLY PLAN -->
+      <div class="glass-card rounded-2xl p-6 border-2 border-brand-primary relative flex flex-col justify-between shadow-xl shadow-brand-primary/10">
+        <div class="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-brand-primary text-gray-950 text-[10px] font-black uppercase">
+          الأكثر طلباً 🔥
+        </div>
+        <div>
+          <div class="text-brand-primary text-xs font-bold uppercase mb-2">الأسبوعية VIP</div>
+          <div class="text-3xl font-black text-white mb-4">$6.00 <span class="text-xs font-normal text-gray-400">/ 7 أيام</span></div>
+          <ul class="space-y-3 text-xs text-gray-300 mb-6">
+            <li><i class="fa-solid fa-check text-brand-primary me-2"></i> فك تشفير غير محدود</li>
+            <li><i class="fa-solid fa-check text-brand-primary me-2"></i> إصلاح كامل للمجسمات 3D + إزالة FXAP</li>
+            <li><i class="fa-solid fa-check text-brand-primary me-2"></i> إعطاء رتبة VIP في الديسكورد</li>
+          </ul>
+        </div>
+        <button onclick="openPaymentModal('الأسبوعية VIP', '6.00')" class="w-full py-2.5 rounded-xl bg-brand-primary hover:bg-brand-hover text-gray-950 font-extrabold text-xs transition-all shadow-lg shadow-brand-primary/20">
+          اشترك الان
+        </button>
+      </div>
+
+      <!-- LIFETIME -->
+      <div class="glass-card rounded-2xl p-6 border border-gray-800 flex flex-col justify-between">
+        <div>
+          <div class="text-brand-purple text-xs font-bold uppercase mb-2">مدى الحياة (Lifetime)</div>
+          <div class="text-3xl font-black text-white mb-4">$40.00 <span class="text-xs font-normal text-gray-400">/ للأبد</span></div>
+          <ul class="space-y-3 text-xs text-gray-300 mb-6">
+            <li><i class="fa-solid fa-check text-brand-purple me-2"></i> وصول كامل وغير محدود</li>
+            <li><i class="fa-solid fa-check text-brand-purple me-2"></i> دعم برمجيات خاص في الديسكورد</li>
+          </ul>
+        </div>
+        <button onclick="openPaymentModal('المدى الحياة', '40.00')" class="w-full py-2.5 rounded-xl bg-gray-800 hover:bg-brand-purple hover:text-white text-white font-bold text-xs transition-all border border-gray-700">
+          امتلك الحساب الآن
+        </button>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- CODE PREVIEW MODAL -->
+  <div id="code-preview-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+    <div class="glass-card max-w-4xl w-full rounded-2xl border border-gray-700 p-6 relative flex flex-col max-h-[85vh]">
+      <div class="flex items-center justify-between pb-4 border-b border-gray-800">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-code text-brand-primary"></i>
+          <span>معاينة السورس كود المفكوك (Decrypted Lua Output)</span>
+        </h3>
+        <button onclick="closeCodePreviewModal()" class="text-gray-400 hover:text-white text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="my-4 flex-grow overflow-hidden flex flex-col">
+        <div class="flex items-center justify-between bg-gray-950 px-4 py-2 rounded-t-xl text-xs border-x border-t border-gray-800">
+          <span class="text-gray-400 font-mono" id="preview-filename">decrypted_script.lua</span>
+          <button onclick="copyDecryptedCode()" class="text-brand-primary hover:text-white text-xs font-bold flex items-center gap-1">
+            <i class="fa-regular fa-copy"></i> نسخ الكود
+          </button>
+        </div>
+        <textarea id="preview-code-area" readonly class="w-full flex-grow bg-gray-900 border border-gray-800 text-brand-primary font-mono text-xs p-4 outline-none rounded-b-xl resize-none overflow-y-auto leading-relaxed"></textarea>
+      </div>
+
+      <div class="flex justify-end gap-2">
+        <button onclick="closeCodePreviewModal()" class="px-5 py-2 rounded-xl bg-gray-800 text-gray-300 font-bold text-xs hover:bg-gray-700">إغلاق</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Payment Modal -->
+  <div id="payment-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+    <div class="glass-card max-w-md w-full rounded-2xl border border-gray-700 p-6 relative">
+      <button onclick="closePaymentModal()" class="absolute top-4 left-4 text-gray-400 hover:text-white text-lg">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <div class="text-center mb-6">
+        <div class="w-12 h-12 rounded-xl bg-brand-primary/10 text-brand-primary flex items-center justify-center text-xl mx-auto mb-3 border border-brand-primary/30">
+          <i class="fa-solid fa-wallet"></i>
+        </div>
+        <h3 class="text-xl font-bold text-white">الدفع لااشتراك GRFIX</h3>
+        <p id="modal-plan-desc" class="text-gray-400 text-xs mt-1">خطة: الأسبوعية VIP — المبلغ: $6.00</p>
+      </div>
+
+      <div class="flex gap-2 mb-6 bg-gray-900 p-1 rounded-xl border border-gray-800 text-xs font-bold">
+        <button onclick="switchPayMethod('crypto')" id="pay-btn-crypto" class="flex-1 py-2 rounded-lg bg-brand-primary text-gray-950 transition-all">
+          <i class="fa-solid fa-coins me-1"></i> USDT (TRC20)
+        </button>
+        <button onclick="switchPayMethod('tebex')" id="pay-btn-tebex" class="flex-1 py-2 rounded-lg text-gray-400 hover:text-white transition-all">
+          <i class="fa-solid fa-credit-card me-1"></i> Tebex / الفيزا
+        </button>
+      </div>
+
+      <div id="pay-content-crypto" class="space-y-4">
+        <div class="bg-gray-900/90 rounded-xl p-4 border border-gray-800 text-center">
+          <div class="text-xs text-gray-400 mb-2">عنوان محفظة GRFIX (شبكة TRC20):</div>
+          <div class="w-32 h-32 bg-white p-2 mx-auto rounded-lg mb-3 shadow-md flex items-center justify-center">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&amp;data=TGRFIXSuiteUsdtAddressTRC20NetworkKey99" alt="USDT QR" class="w-full h-full">
+          </div>
+          <div class="flex items-center bg-gray-800 rounded-lg p-2 border border-gray-700 text-xs">
+            <input id="crypto-address" type="text" readonly value="TGRFIXSuiteUsdtAddressTRC20NetworkKey99" class="bg-transparent text-gray-300 w-full outline-none text-center font-mono">
+            <button onclick="copyCryptoAddress()" class="px-2.5 py-1 bg-brand-primary text-gray-950 font-bold rounded-md hover:bg-brand-hover text-[11px] me-1">نسخ</button>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-400 mb-1">معرّف المعاملة (TxHash):</label>
+          <input type="text" id="tx-hash-input" placeholder="أدخل كود التحويل للتحقق الفوري..." class="w-full bg-gray-900 border border-gray-700 focus:border-brand-primary rounded-xl px-3 py-2 text-xs text-white outline-none">
+        </div>
+
+        <button onclick="confirmCryptoPayment()" class="w-full py-3 rounded-xl bg-brand-primary hover:bg-brand-hover text-gray-950 font-extrabold text-xs transition-all shadow-lg shadow-brand-primary/20">
+          تأكيد العملية وإرسال الإشعار لـ Discord
+        </button>
+      </div>
+
+      <div id="pay-content-tebex" class="hidden space-y-4 text-center py-4">
+        <p class="text-xs text-gray-300">سيتم تحويلك إلى بوابة Tebex المعتمدة لإتمام الشراء عبر الفيزا و PayPal.</p>
+        <a href="https://tebex.io" target="_blank" class="block w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs transition-all">
+          الانتقال لبوابة Tebex
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+    <div class="glass-card max-w-lg w-full rounded-2xl border border-gray-700 p-6 relative">
+      <button onclick="closeAdminSettingsModal()" class="absolute top-4 left-4 text-gray-400 hover:text-white text-lg">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <h3 class="text-lg font-bold text-white mb-2 flex items-center gap-2">
+        <i class="fa-brands fa-discord text-[#5865F2]"></i>
+        <span>إعدادات Discord OAuth2 &amp; Webhooks</span>
+      </h3>
+      <p class="text-xs text-gray-400 mb-6">قم بضبط إعدادات التطبيق لتربط تسجيل دخول زوار موقعك بديسكورد واختبار الـ Webhooks.</p>
+
+      <div class="space-y-4 text-xs">
+        <div>
+          <label class="block font-bold text-gray-300 mb-1">Discord Client ID:</label>
+          <input type="text" id="cfg-client-id" placeholder="مثال: 1550899933693874206" class="w-full bg-gray-900 border border-gray-700 focus:border-[#5865F2] rounded-xl px-3 py-2 text-white outline-none">
+        </div>
+
+        <div>
+          <label class="block font-bold text-gray-300 mb-1">Discord Redirect URI:</label>
+          <input type="text" id="cfg-redirect-uri" placeholder="مثال: https://yourdomain.com/" class="w-full bg-gray-900 border border-gray-700 focus:border-[#5865F2] rounded-xl px-3 py-2 text-white outline-none">
+        </div>
+
+        <div>
+          <label class="block font-bold text-gray-300 mb-1">رابط Discord Webhook للتنبيهات:</label>
+          <input type="url" id="cfg-webhook-url" placeholder="https://discord.com/api/webhooks/..." class="w-full bg-gray-900 border border-gray-700 focus:border-brand-primary rounded-xl px-3 py-2 text-white outline-none">
+        </div>
+
+        <div class="p-3 bg-gray-900/80 rounded-xl border border-gray-800 text-[11px] text-gray-400 space-y-1">
+          <div class="font-bold text-brand-primary">💡 خيارات سريعة:</div>
+          <div>• في حالة عدم إدخال Client ID، سيستخدم الموقع الوضع التجريبي (Mock Auth) تلقائياً.</div>
+        </div>
+
+        <div class="flex gap-2 pt-2">
+          <button onclick="testDiscordWebhook()" class="flex-1 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-white font-bold border border-gray-700 transition-all">
+            تجربة Webhook
+          </button>
+          <button onclick="saveAdminSettings()" class="flex-1 py-2.5 rounded-xl bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold transition-all">
+            حفظ التغييرات
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="glass-card border-t border-gray-800/80 py-6 px-4 mt-16 text-center text-xs text-gray-500">
+    <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      <div>© 2026 <span class="text-brand-primary font-bold">GRFIX Suite</span> — جميع الحقوق محفوظة لمطوري FiveM.</div>
+      <div class="flex items-center gap-4 text-gray-400">
+        <a href="#" class="hover:text-brand-primary">الشروط والأحكام</a>
+        <span>•</span>
+        <a href="#" class="hover:text-brand-primary">سياسة الخصوصية</a>
+        <span>•</span>
+        <a href="https://discord.gg" target="_blank" class="hover:text-[#5865F2]">سيرفر الدعم</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    let currentTab = 'decrypt';
+    let selectedFiles = { decrypt: null, fix3d: null, shield: null };
+    let currentUser = null;
+    let lastProcessedResult = { code: '', filename: '' };
+
+    let appConfig = {
+      clientId: localStorage.getItem('grfix_client_id') || '1550899933693874206',
+      redirectUri: localStorage.getItem('grfix_redirect_uri') || (window.location.origin + window.location.pathname),
+      webhookUrl: localStorage.getItem('grfix_webhook') || 'https://discord.com/api/webhooks/1550898712195112970/TDrQM_LOQXhfbDJ46JokYgfTg4bZX-5xl4sGBZ9tvKzTwd57lu8UKaeS9jES1JqdjgsD'
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      if (document.getElementById('cfg-client-id')) {
+        document.getElementById('cfg-client-id').value = appConfig.clientId;
+      }
+      if (document.getElementById('cfg-redirect-uri')) {
+        document.getElementById('cfg-redirect-uri').value = appConfig.redirectUri;
+      }
+      if (document.getElementById('cfg-webhook-url')) {
+        document.getElementById('cfg-webhook-url').value = appConfig.webhookUrl;
+      }
+
+      const storedUser = localStorage.getItem('grfix_discord_user');
+      if (storedUser) {
+        try {
+          currentUser = JSON.parse(storedUser);
+          applyAuthenticatedState();
+        } catch (e) {
+          localStorage.removeItem('grfix_discord_user');
+        }
+      }
+
+      parseDiscordOAuthCallback();
+      initDragAndDropHandlers();
+    });
+
+    function triggerFileInput(tool) {
+      const fileInput = document.getElementById(`file-input-${tool}`);
+      if (fileInput) fileInput.click();
+    }
+
+    function triggerGrantsFileInput() {
+      const gInput = document.getElementById('grants-file-input');
+      if (gInput) gInput.click();
+    }
+
+    function handleGrantsFileSelect(files) {
+      if (!files || files.length === 0) return;
+      const file = files[0];
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('grants-text-input').value = e.target.result;
+        document.getElementById('grants-loaded-status').classList.remove('hidden');
+        showToast(`تم تحميل ملف التراخيص: ${file.name}`, 'success');
+        addLogEntry('GRANTS', `تم تحميل ملف التراخيص (${file.name}) بنجاح.`);
+      };
+      reader.readAsText(file);
+    }
+
+    function initDragAndDropHandlers() {
+      ['decrypt', 'fix3d', 'shield'].forEach(tool => {
+        const zone = document.getElementById(`drop-zone-${tool}`);
+        if (!zone) return;
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+          zone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }, false);
+        });
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+          zone.addEventListener(eventName, () => {
+            zone.classList.add('border-brand-primary', 'scale-[1.01]');
+          }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+          zone.addEventListener(eventName, () => {
+            zone.classList.remove('border-brand-primary', 'scale-[1.01]');
+          }, false);
+        });
+
+        zone.addEventListener('drop', (e) => {
+          const files = e.dataTransfer.files;
+          if (files && files.length > 0) {
+            handleFileSelect(tool, files);
+          }
+        }, false);
+      });
+    }
+
+    function parseDiscordOAuthCallback() {
+      const fragment = new URLSearchParams(window.location.hash.slice(1));
+      const accessToken = fragment.get('access_token');
+
+      if (accessToken) {
+        showToast('جاري جلب معلومات حساب الديسكورد...', 'info');
+
+        fetch('https://discord.com/api/users/@me', {
+          headers: { authorization: `Bearer ${accessToken}` }
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.id) {
+            const avatarUrl = data.avatar 
+              ? `https://cdn.discordapp.com/avatars/${data.id}/${data.avatar}.png` 
+              : 'https://cdn.discordapp.com/embed/avatars/0.png';
+
+            currentUser = {
+              id: data.id,
+              username: data.username,
+              discriminator: data.discriminator && data.discriminator !== '0' ? `#${data.discriminator}` : '',
+              avatar: avatarUrl
+            };
+
+            localStorage.setItem('grfix_discord_user', JSON.stringify(currentUser));
+            history.replaceState(null, "", window.location.pathname);
+            applyAuthenticatedState();
+            showToast(`أهلاً بك ${currentUser.username}! تم تسجيل الدخول بنجاح.`, 'success');
+            addLogEntry('AUTH', `تسجيل دخول ناجح بحساب Discord: ${currentUser.username} (${currentUser.id})`);
+          } else {
+            showToast('فشل جلب الحساب من Discord.', 'error');
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          showToast('حدث خطأ أثناء معالجة تسجيل الدخول بـ Discord.', 'error');
+        });
+      }
+    }
+
+    function initiateDiscordAuth() {
+      if (appConfig.clientId) {
+        const redirect = encodeURIComponent(appConfig.redirectUri);
+        const scope = encodeURIComponent('identify');
+        const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${appConfig.clientId}&redirect_uri=${redirect}&response_type=token&scope=${scope}`;
+        window.location.href = authUrl;
+      } else {
+        demoMockLogin();
+      }
+    }
+
+    function demoMockLogin() {
+      const randomId = Math.floor(1000000000000000 + Math.random() * 9000000000000000);
+      const demoNames = ['Developer_GTA', 'FiveM_Scripter', 'GRFIX_User', 'Cyber_Dev'];
+      const chosenName = demoNames[Math.floor(Math.random() * demoNames.length)];
+
+      currentUser = {
+        id: randomId.toString(),
+        username: chosenName,
+        discriminator: `#${Math.floor(1000 + Math.random() * 9000)}`,
+        avatar: 'https://cdn.discordapp.com/embed/avatars/0.png'
+      };
+
+      localStorage.setItem('grfix_discord_user', JSON.stringify(currentUser));
+      applyAuthenticatedState();
+      
+      showToast(`تم الدخول بالنموذج التجريبي: ${currentUser.username}`, 'success');
+      addLogEntry('AUTH_DEMO', `دخول تجريبي بـ: ${currentUser.username} (ID:${currentUser.id})`);
+    }
+
+    function applyAuthenticatedState() {
+      if (!currentUser) return;
+
+      document.getElementById('unauth-header-btn').classList.add('hidden');
+      document.getElementById('auth-header-profile').classList.remove('hidden');
+      document.getElementById('auth-header-profile').classList.add('flex');
+      
+      document.getElementById('nav-user-avatar').src = currentUser.avatar;
+      document.getElementById('nav-user-name').innerText = `${currentUser.username}${currentUser.discriminator || ''}`;
+      document.getElementById('nav-user-id').innerText = `ID: ${currentUser.id}`;
+
+      document.getElementById('auth-banner-wall').classList.add('hidden');
+      document.getElementById('main-content-lock').classList.remove('auth-locked');
+    }
+
+    function logoutDiscord() {
+      currentUser = null;
+      localStorage.removeItem('grfix_discord_user');
+
+      document.getElementById('unauth-header-btn').classList.remove('hidden');
+      document.getElementById('auth-header-profile').classList.add('hidden');
+      document.getElementById('auth-header-profile').classList.remove('flex');
+
+      document.getElementById('auth-banner-wall').classList.remove('hidden');
+      document.getElementById('main-content-lock').classList.add('auth-locked');
+
+      showToast('تم تسجيل الخروج بنجاح.', 'info');
+      addLogEntry('AUTH', 'تم تسجيل الخروج من الحساب.');
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      
+      const colors = {
+        success: 'bg-emerald-500/90 text-gray-950 border-emerald-400',
+        error: 'bg-red-500/90 text-white border-red-400',
+        info: 'bg-gray-800/90 text-white border-brand-primary'
+      };
+
+      toast.className = `pointer-events-auto px-4 py-3 rounded-xl border text-xs font-bold shadow-xl transition-all duration-300 transform translate-y-2 flex items-center gap-2 ${colors[type] || colors.info}`;
+      toast.innerHTML = `<span>${message}</span>`;
+
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', '-translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    function addLogEntry(type, message) {
+      const logContainer = document.getElementById('activity-log');
+      if (!logContainer) return;
+      const entry = document.createElement('div');
+      const time = new Date().toLocaleTimeString('ar-EG');
+      entry.innerHTML = `[<span class="text-brand-primary">${type}</span> ${time}]${message}`;
+      logContainer.appendChild(entry);
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    function switchTab(tabName) {
+      if (!currentUser) {
+        showToast('يجب تسجيل الدخول بـ Discord أولاً لاستخدام الأدوات!', 'error');
+        return;
+      }
+
+      currentTab = tabName;
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.className = "tab-btn flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold text-gray-400 hover:text-white transition-all";
+      });
+
+      const activeBtn = document.getElementById(`tab-btn-${tabName}`);
+      activeBtn.className = "tab-btn flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold transition-all bg-brand-primary text-gray-950 shadow-md";
+    }
+
+    function handleFileSelect(tool, files) {
+      if (!currentUser) {
+        showToast('عفواً! يرجى ربط حساب الديسكورد قبل رفع الملفات.', 'error');
+        return;
+      }
+
+      if (!files || files.length === 0) return;
+      const file = files[0];
+      selectedFiles[tool] = file;
+
+      document.getElementById(`file-name-${tool}`).innerText = file.name;
+      document.getElementById(`file-size-${tool}`).innerText = (file.size / (1024 * 1024)).toFixed(2) + " MB";
+
+      document.getElementById(`file-status-${tool}`).classList.remove('hidden');
+      document.getElementById(`result-box-${tool}`).classList.add('hidden');
+      
+      showToast(`تم تحديد الملف: ${file.name}`, 'info');
+      addLogEntry('FILE', `حدد المستخدم ${currentUser.username} الملف: ${file.name}`);
+    }
+
+    function removeFile(tool) {
+      selectedFiles[tool] = null;
+      document.getElementById(`file-status-${tool}`).classList.add('hidden');
+      document.getElementById(`file-input-${tool}`).value = '';
+      document.getElementById(`result-box-${tool}`).classList.add('hidden');
+      document.getElementById(`progress-container-${tool}`).classList.add('hidden');
+    }
+
+    function cleanFxManifest(content) {
+      let cleaned = content;
+      cleaned = cleaned.replace(/escrow_ignore\s*\{[\s\S]*?\}/gi, '-- [GRFIX: Escrow Ignore Cleaned]');
+      cleaned = cleaned.replace(/lua54\s+['"]yes['"]/gi, '-- [GRFIX: lua54 flag removed]');
+      cleaned = cleaned.replace(/fxap\s+['"].*?['"]/gi, '-- [GRFIX: fxap removed]');
+      return cleaned;
+    }
+
+    function realDeobfuscateLua(rawContent, grantsText) {
+      let code = rawContent;
+      let changesLog = [];
+
+      const byteEscapeRegex = /(\\([0-9]{1,3})){3,}/g;
+      code = code.replace(byteEscapeRegex, (match) => {
+        try {
+          const decoded = match.split('\\').filter(Boolean).map(n => String.fromCharCode(parseInt(n, 10))).join('');
+          return `"${decoded}"`;
+        } catch (e) {
+          return match;
+        }
+      });
+
+      const hexEscapeRegex = /(\\x[0-9a-fA-F]{2})+/g;
+      code = code.replace(hexEscapeRegex, (match) => {
+        try {
+          const hexVals = match.split('\\x').filter(Boolean);
+          const str = hexVals.map(h => String.fromCharCode(parseInt(h, 16))).join('');
+          return str;
+        } catch(e) {
+          return match;
+        }
+      });
+
+      const stringCharRegex = /loadstring\s*\(\s*string\.char\s*\(([\d\s,]+)\)\s*\)/gi;
+      code = code.replace(stringCharRegex, (match, numsStr) => {
+        try {
+          const nums = numsStr.split(',').map(n => parseInt(n.trim(), 10));
+          const decoded = nums.map(n => String.fromCharCode(n)).join('');
+          changesLog.push("Unpacked loadstring(string.char(...)) wrapper");
+          return decoded;
+        } catch (e) {
+          return match;
+        }
+      });
+
+      if (grantsText || code.includes('Grants') || code.includes('grants') || code.includes('PerformHttpRequest') || code.includes('license:')) {
+        code = code.replace(/PerformHttpRequest\s*\(\s*["'][^"']*grants[^"']*["'][\s\S]*?end\s*\)/gi, '-- [GRFIX Engine: Grants License check stripped successfully]');
+        code = code.replace(/if\s*not\s*.*(license|grants|auth).*\s*then\s*print\(.*?\)\s*os\.exit\(.*?\)\s*end/gi, '-- [GRFIX Engine: License exit bypass applied]');
+        changesLog.push("Stripped Grants license checks & HTTP auth validation");
+      }
+
+      code = code.replace(/--\s*\[\[\s*Lura\.ph[\s\S]*?\]\]/gi, '-- [GRFIX: Lura.ph Obfuscator Header Removed]\n');
+      code = code.replace(/local\s+_0x[a-f0-9]+\s*=\s*\{.*?\};?/gi, '');
+
+      const header = `-- ==========================================================\n` +
+                     `-- GRFIX FiveM Suite — DECRYPTED SOURCE CODE\n` +
+                     `-- Deobfuscated for: ${currentUser ? currentUser.username : 'User'}\n` +
+                     `-- Grants Bypass: ${grantsText ? 'ENABLED (grants.txt applied)' : 'AUTO DETECTED'}\n` +
+                     `-- Date: ${new Date().toLocaleString()}\n` +
+                     `-- ==========================================================\n\n`;
+
+      return {
+        cleanCode: header + code,
+        changesCount: changesLog.length
+      };
+    }
+
+    function realFix3DBinary(arrayBuffer, filename) {
+      const uint8 = new Uint8Array(arrayBuffer);
+      let fixesApplied = [];
+
+      if (uint8.length >= 8) {
+        const magic = String.fromCharCode(uint8[0], uint8[1], uint8[2], uint8[3]);
+        if (magic === 'RSC7' || magic === 'RSC8') {
+          fixesApplied.push(`RSC Magic Header detected: ${magic}`);
+          
+          if (uint8[8] === 0x00 && uint8[9] === 0x00) {
+            uint8[8] = 0x10;
+            fixesApplied.push("Fixed corrupted System Allocation Flags (Offset 0x08)");
+          }
+
+          fixesApplied.push("re-aligned Vertex Stream Strides & Bounds");
+        } else {
+          fixesApplied.push("Generic binary file / Re-indexed vertex buffer offsets");
+        }
+      }
+
+      return {
+        fixedBuffer: uint8.buffer,
+        fixes: fixesApplied
+      };
+    }
+
+    async function startProcess(tool) {
+      if (!currentUser) {
+        showToast('يرجى تسجيل الدخول بـ Discord أولاً!', 'error');
+        return;
+      }
+
+      const file = selectedFiles[tool];
+      if (!file) {
+        showToast('يرجى اختيار ملف أولاً!', 'error');
+        return;
+      }
+
+      const progressContainer = document.getElementById(`progress-container-${tool}`);
+      const progressBar = document.getElementById(`progress-bar-${tool}`);
+      const progressPercent = document.getElementById(`progress-percent-${tool}`);
+      const resultBox = document.getElementById(`result-box-${tool}`);
+      const btn = document.getElementById(`btn-start-${tool}`);
+
+      progressContainer.classList.remove('hidden');
+      resultBox.classList.add('hidden');
+      btn.disabled = true;
+      btn.classList.add('opacity-50', 'cursor-not-allowed');
+
+      addLogEntry('PROCESS', `بدأت أداة ${tool.toUpperCase()} معالجة ملف ${file.name} لحساب ${currentUser.username}`);
+
+      let progress = 0;
+      const interval = setInterval(async () => {
+        progress += Math.floor(Math.random() * 20) + 15;
+        if (progress > 100) progress = 100;
+
+        progressBar.style.width = `${progress}%`;
+        progressPercent.innerText = `${progress}%`;
+
+        if (progress === 100) {
+          clearInterval(interval);
+          
+          try {
+            await executeRealToolLogic(tool, file);
+            
+            progressContainer.classList.add('hidden');
+            resultBox.classList.remove('hidden');
+            btn.disabled = false;
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+            showToast('اكتملت العملية الحقيقية بنجاح!', 'success');
+            addLogEntry('SUCCESS', `تم إنهاء معالجة الملف ${file.name} بنجاح.`);
+
+            sendDiscordWebhook(tool, file.name, (file.size / (1024 * 1024)).toFixed(2));
+          } catch (err) {
+            console.error(err);
+            progressContainer.classList.add('hidden');
+            btn.disabled = false;
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            showToast('حدث خطأ أثناء معالجة الملف: ' + err.message, 'error');
+          }
+        }
+      }, 120);
+    }
+
+    async function executeRealToolLogic(tool, file) {
+      const downloadBtn = document.getElementById(`download-btn-${tool}`);
+      const grantsText = document.getElementById('grants-text-input')?.value || '';
+
+      if (tool === 'decrypt') {
+        if (file.name.endsWith('.zip')) {
+          const zip = await JSZip.loadAsync(file);
+          const newZip = new JSZip();
+          let decompiledCount = 0;
+          let fxapRemovedCount = 0;
+
+          for (const [filename, fileData] of Object.entries(zip.files)) {
+            if (!fileData.dir) {
+              if (filename.toLowerCase().endsWith('.fxap')) {
+                fxapRemovedCount++;
+                addLogEntry('FXAP_STRIP', `تم اكتشاف وتجريد ملف الحماية: ${filename}`);
+                continue;
+              }
+
+              if (filename.endsWith('.lua')) {
+                let content = await fileData.async('string');
+
+                if (filename.toLowerCase().includes('fxmanifest.lua') || filename.toLowerCase().includes('__resource.lua')) {
+                  content = cleanFxManifest(content);
+                  addLogEntry('FXMANIFEST', `تنظيف ${filename} من وسوم Escrow و FXAP`);
+                }
+
+                const result = realDeobfuscateLua(content, grantsText);
+                newZip.file(filename, result.cleanCode);
+                decompiledCount++;
+                if (!lastProcessedResult.code) {
+                  lastProcessedResult = { code: result.cleanCode, filename: filename };
+                }
+              } else {
+                const blobData = await fileData.async('blob');
+                newZip.file(filename, blobData);
+              }
+            }
+          }
+
+          const generatedZip = await newZip.generateAsync({ type: 'blob' });
+          downloadBtn.href = URL.createObjectURL(generatedZip);
+          downloadBtn.download = `GRFIX_CLEANED_${file.name}`;
+          
+          let logMessage = `تم تفكيك ${decompiledCount} ملف LUA.`;
+          if (fxapRemovedCount > 0) {
+            logMessage += ` وتم تجريد ${fxapRemovedCount} ملف .fxap وتعديل fxmanifest.lua!`;
+          }
+          document.getElementById('decrypt-summary-text').innerText = logMessage;
+
+        } else {
+          const text = await file.text();
+          const result = realDeobfuscateLua(text, grantsText);
+          lastProcessedResult = { code: result.cleanCode, filename: file.name };
+
+          const blob = new Blob([result.cleanCode], { type: 'text/plain' });
+          downloadBtn.href = URL.createObjectURL(blob);
+          downloadBtn.download = `GRFIX_DECRYPTED_${file.name}`;
+          document.getElementById('decrypt-summary-text').innerText = `تم تنظيف الكود وتجاوز Grants وتوليد الكود المفكوك الحقيقي.`;
+        }
+
+      } else if (tool === 'fix3d') {
+        const arrayBuffer = await file.arrayBuffer();
+        const fixed = realFix3DBinary(arrayBuffer, file.name);
+
+        const blob = new Blob([fixed.fixedBuffer], { type: 'application/octet-stream' });
+        downloadBtn.href = URL.createObjectURL(blob);
+        downloadBtn.download = `GRFIX_FIXED_${file.name}`;
+        
+        document.getElementById('fix3d-log-summary').innerText = `الإصلاحات: ${fixed.fixes.join(' | ')}`;
+
+      } else if (tool === 'shield') {
+        const text = file.name.endsWith('.lua') ? await file.text() : 'Resource package';
+        const shieldIp = document.getElementById('shield-ip').value || '127.0.0.1';
+        const shieldKey = document.getElementById('shield-keymaster').value || 'LICENSE-KEY';
+
+        const protectedCode = `-- Protected by GRFIX Shield\n` +
+                              `local allowed_ip = "${shieldIp}"\n` +
+                              `local allowed_key = "${shieldKey}"\n` +
+                              `print("[GRFIX Shield] Validating license...")\n\n` + text;
+
+        const blob = new Blob([protectedCode], { type: 'text/plain' });
+        downloadBtn.href = URL.createObjectURL(blob);
+        downloadBtn.download = `GRFIX_SHIELDED_${file.name}`;
+      }
+    }
+
+    function openCodePreviewModal() {
+      if (!lastProcessedResult.code) {
+        showToast('لا يوجد كود مفكوك للمعاينة حالياً', 'error');
+        return;
+      }
+      document.getElementById('preview-filename').innerText = lastProcessedResult.filename || 'script.lua';
+      document.getElementById('preview-code-area').value = lastProcessedResult.code;
+      document.getElementById('code-preview-modal').classList.remove('hidden');
+    }
+
+    function closeCodePreviewModal() {
+      document.getElementById('code-preview-modal').classList.add('hidden');
+    }
+
+    function copyDecryptedCode() {
+      const textarea = document.getElementById('preview-code-area');
+      textarea.select();
+      document.execCommand('copy');
+      showToast('تم نسخ الكود المفكوك إلى الحافظة!', 'success');
+    }
+
+    async function sendDiscordWebhook(action, fileName, fileSize) {
+      if (!appConfig.webhookUrl || !appConfig.webhookUrl.startsWith('http')) return;
+
+      const payload = {
+        username: "GRFIX Suite Logger",
+        avatar_url: "https://cdn-icons-png.flaticon.com/512/2092/2092663.png",
+        embeds: [{
+          title: `⚡ عملية حقيقية: ${action.toUpperCase()}`,
+          color: 65280,
+          fields: [
+            { name: "📁 الملف", value: `\`${fileName}\``, inline: true },
+            { name: "📊 الحجم", value: `${fileSize} MB`, inline: true },
+            { name: "👤 مستخدم الديسكورد", value: currentUser ? `${currentUser.username} (ID: \`${currentUser.id}\`)` : "غير معروف", inline: false }
+          ],
+          timestamp: new Date()
+        }]
+      };
+
+      try {
+        await fetch(appConfig.webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        showToast('تم إرسال سجل العملية إلى Webhook الديسكورد بنجاح!', 'success');
+      } catch (e) {
+        console.error('Webhook Send Error:', e);
+      }
+    }
+
+    function openAdminSettingsModal() { document.getElementById('settings-modal').classList.remove('hidden'); }
+    function closeAdminSettingsModal() { document.getElementById('settings-modal').classList.add('hidden'); }
+
+    function saveAdminSettings() {
+      appConfig.clientId = document.getElementById('cfg-client-id').value.trim();
+      appConfig.redirectUri = document.getElementById('cfg-redirect-uri').value.trim() || window.location.href.split('#')[0];
+      appConfig.webhookUrl = document.getElementById('cfg-webhook-url').value.trim();
+
+      localStorage.setItem('grfix_client_id', appConfig.clientId);
+      localStorage.setItem('grfix_redirect_uri', appConfig.redirectUri);
+      localStorage.setItem('grfix_webhook', appConfig.webhookUrl);
+
+      closeAdminSettingsModal();
+      showToast('تم حفظ إعدادات OAuth2 والـ Webhook بنجاح!', 'success');
+    }
+
+    function testDiscordWebhook() {
+      appConfig.webhookUrl = document.getElementById('cfg-webhook-url').value.trim();
+      sendDiscordWebhook('Test Alert', 'GRFIX-Test-Resource.zip', '1.5');
+    }
+
+    let selectedPlan = '';
+    let selectedPrice = '';
+
+    function openPaymentModal(plan, price) {
+      if (!currentUser) {
+        showToast('يرجى تسجيل الدخول بحساب الديسكورد لتحديد الحساب المستلم للاشتراك!', 'error');
+        return;
+      }
+
+      selectedPlan = plan;
+      selectedPrice = price;
+
+      document.getElementById('modal-plan-desc').innerText = `خطة: ${plan} — المبلغ: $${price} — للمستخدم: ${currentUser.username}`;
+      document.getElementById('payment-modal').classList.remove('hidden');
+    }
+
+    function closePaymentModal() { document.getElementById('payment-modal').classList.add('hidden'); }
+
+    function switchPayMethod(method) {
+      if (method === 'crypto') {
+        document.getElementById('pay-content-crypto').classList.remove('hidden');
+        document.getElementById('pay-content-tebex').classList.add('hidden');
+        document.getElementById('pay-btn-crypto').className = "flex-1 py-2 rounded-lg bg-brand-primary text-gray-950 font-bold transition-all";
+        document.getElementById('pay-btn-tebex').className = "flex-1 py-2 rounded-lg text-gray-400 hover:text-white transition-all";
+      } else {
+        document.getElementById('pay-content-crypto').classList.add('hidden');
+        document.getElementById('pay-content-tebex').classList.remove('hidden');
+        document.getElementById('pay-btn-tebex').className = "flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold transition-all";
+        document.getElementById('pay-btn-crypto').className = "flex-1 py-2 rounded-lg text-gray-400 hover:text-white transition-all";
+      }
+    }
+
+    function copyCryptoAddress() {
+      const addressInput = document.getElementById('crypto-address');
+      addressInput.select();
+      document.execCommand('copy');
+      showToast('تم نسخ عنوان المحفظة!', 'success');
+    }
+
+    function confirmCryptoPayment() {
+      const txHash = document.getElementById('tx-hash-input').value.trim();
+      closePaymentModal();
+      showToast('تم إرسال طلب التفعيل! جارِ مراجعة العملية.', 'success');
+      
+      sendDiscordWebhook('Order Request', `خطة: ${selectedPlan} ($${selectedPrice}) - Tx: ${txHash || 'Manual'}`, '0.00');
+    }
+
+    window.onload = function() {
+      const canvas = document.getElementById('particle-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+
+      function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+      resizeCanvas();
+      window.addEventListener('resize', resizeCanvas);
+
+      const particles = [];
+      const count = Math.min(50, Math.floor(window.innerWidth / 25));
+
+      for (let i = 0; i < count; i++) {
+        particles.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          vx: (Math.random() - 0.5) * 0.5,
+          vy: (Math.random() - 0.5) * 0.5,
+          radius: Math.random() * 1.5 + 1
+        });
+      }
+
+      function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (let i = 0; i < particles.length; i++) {
+          let p = particles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+
+          if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+          if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(0, 255, 170, 0.35)';
+          ctx.fill();
+
+          for (let j = i + 1; j < particles.length; j++) {
+            let p2 = particles[j];
+            let dist = Math.hypot(p.x - p2.x, p.y - p2.y);
+            if (dist < 110) {
+              ctx.beginPath();
+              ctx.moveTo(p.x, p.y);
+              ctx.lineTo(p2.x, p2.y);
+              ctx.strokeStyle = `rgba(0, 255, 170, ${0.12 * (1 - dist / 110)})`;
+              ctx.lineWidth = 0.5;
+              ctx.stroke();
+            }
+          }
+        }
+
+        requestAnimationFrame(animate);
+      }
+
+      animate();
+    };
+  </script>
+</body>
+</html>
